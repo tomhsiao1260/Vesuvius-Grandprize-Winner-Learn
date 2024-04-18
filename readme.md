@@ -14,7 +14,7 @@ pip install -r requirements.txt
 ./download.sh
 ```
 
-在[這裡](https://drive.google.com/drive/folders/1rn3GMOvtJRMBHOxVhWFVSY6IVI6xUnYp)下載模型，放到 checkpoints 資料夾
+在 [這裡](https://drive.google.com/drive/folders/1rn3GMOvtJRMBHOxVhWFVSY6IVI6xUnYp) 下載模型，放到 checkpoints 資料夾
 
 ```
 timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt

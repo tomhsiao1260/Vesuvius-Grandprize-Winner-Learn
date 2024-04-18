@@ -1,10 +1,9 @@
+.DS_Store
+
 /env
 
-/train_scrolls
+/train_scrolls/*
 !/train_scrolls/.gitkeep
 
-/checkpoints
+/checkpoints/*
 !/checkpoints/.gitkeep
-
-
-.DS_Store
