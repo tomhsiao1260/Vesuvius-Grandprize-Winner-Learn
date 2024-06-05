@@ -1,9 +1,7 @@
-from tap import Tap
+import torch
+import pytorch_lightning as pl
+import numpy as np
 
-class InferenceArgumentParser(Tap):
-    model_path:str= 'checkpoints/timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt'
-    
-args = InferenceArgumentParser().parse_args()
 
 if __name__ == "__main__":
-    print(args.model_path)
+    pass
