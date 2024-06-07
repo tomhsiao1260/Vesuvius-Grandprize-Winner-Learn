@@ -142,30 +142,30 @@ def get_img_splits(fragment_id,s,e,rotation=0):
     images = []
     xyxys = []
     image,fragment_mask = read_image_mask(fragment_id,s,e,rotation)
-    x1_list = list(range(0, image.shape[1]-CFG.tile_size+1, CFG.stride))
-    y1_list = list(range(0, image.shape[0]-CFG.tile_size+1, CFG.stride))
-    for y1 in y1_list:
-        for x1 in x1_list:
-            y2 = y1 + CFG.tile_size
-            x2 = x1 + CFG.tile_size
-            if not np.any(fragment_mask[y1:y2, x1:x2]==0):
-                images.append(image[y1:y2, x1:x2])
-                xyxys.append([x1, y1, x2, y2])
-    test_dataset = CustomDatasetTest(images,np.stack(xyxys), CFG,transform=A.Compose([
-        A.Resize(CFG.size, CFG.size),
-        A.Normalize(
-            mean= [0] * CFG.in_chans,
-            std= [1] * CFG.in_chans
-        ),
-        ToTensorV2(transpose_mask=True),
-    ]))
+    # x1_list = list(range(0, image.shape[1]-CFG.tile_size+1, CFG.stride))
+    # y1_list = list(range(0, image.shape[0]-CFG.tile_size+1, CFG.stride))
+    # for y1 in y1_list:
+    #     for x1 in x1_list:
+    #         y2 = y1 + CFG.tile_size
+    #         x2 = x1 + CFG.tile_size
+    #         if not np.any(fragment_mask[y1:y2, x1:x2]==0):
+    #             images.append(image[y1:y2, x1:x2])
+    #             xyxys.append([x1, y1, x2, y2])
+    # test_dataset = CustomDatasetTest(images,np.stack(xyxys), CFG,transform=A.Compose([
+    #     A.Resize(CFG.size, CFG.size),
+    #     A.Normalize(
+    #         mean= [0] * CFG.in_chans,
+    #         std= [1] * CFG.in_chans
+    #     ),
+    #     ToTensorV2(transpose_mask=True),
+    # ]))
 
-    test_loader = DataLoader(test_dataset,
-                              batch_size=CFG.valid_batch_size,
-                              shuffle=False,
-                              num_workers=CFG.num_workers, pin_memory=True, drop_last=False,
-                              )
-    return test_loader, np.stack(xyxys),(image.shape[0],image.shape[1]),fragment_mask
+    # test_loader = DataLoader(test_dataset,
+    #                           batch_size=CFG.valid_batch_size,
+    #                           shuffle=False,
+    #                           num_workers=CFG.num_workers, pin_memory=True, drop_last=False,
+    #                           )
+    # return test_loader, np.stack(xyxys),(image.shape[0],image.shape[1]),fragment_mask
 
 def get_transforms(data, cfg):
     if data == 'valid':
@@ -312,31 +312,29 @@ if __name__ == "__main__":
     # model.cuda()
     model.eval()
 
-    for fragment_id in args.segment_id:
-        if os.path.exists(f"{args.segment_path}/{fragment_id}/layers/00.{args.format}"):
-            preds=[]
-            for r in [0]:
-                for i in [17]:
-                    start_f=i
-                    end_f=start_f+CFG.in_chans
-                    test_loader,test_xyxz,test_shape,fragment_mask=get_img_splits(fragment_id,start_f,end_f,r)
-                    mask_pred= predict_fn(test_loader, model, device, test_xyxz,test_shape)
-                    mask_pred=np.clip(np.nan_to_num(mask_pred),a_min=0,a_max=1)
-                    mask_pred/=mask_pred.max()
+    preds=[]
+    start_f = 0
+    end_f = start_f + 26
+    fragment_id = '20230509182749'
+    get_img_splits(fragment_id,start_f,end_f,r)
+    # test_loader,test_xyxz,test_shape,fragment_mask=get_img_splits(fragment_id,start_f,end_f,r)
+    # mask_pred= predict_fn(test_loader, model, device, test_xyxz,test_shape)
+    # mask_pred=np.clip(np.nan_to_num(mask_pred),a_min=0,a_max=1)
+    # mask_pred/=mask_pred.max()
 
-                    preds.append(mask_pred)
+    # preds.append(mask_pred)
 
-            gc.collect()
+    # gc.collect()
 
-            if len(args.out_path) > 0:
-                # CV2 image
-                image_cv = (mask_pred * 255).astype(np.uint8)
-                try:
-                    os.makedirs(args.out_path,exist_ok=True)
-                except:
-                    pass
-                cv2.imwrite(os.path.join(args.out_path, f"{fragment_id}_prediction.png"), image_cv)
+    # if len(args.out_path) > 0:
+    #     # CV2 image
+    #     image_cv = (mask_pred * 255).astype(np.uint8)
+    #     try:
+    #         os.makedirs(args.out_path,exist_ok=True)
+    #     except:
+    #         pass
+    #     cv2.imwrite(os.path.join(args.out_path, f"{fragment_id}_prediction.png"), image_cv)
 
-    del mask_pred,test_loader,model
-    torch.cuda.empty_cache()
-    gc.collect()
+    # del mask_pred,test_loader,model
+    # torch.cuda.empty_cache()
+    # gc.collect()
