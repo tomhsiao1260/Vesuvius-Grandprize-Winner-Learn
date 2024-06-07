@@ -25,9 +25,9 @@ from tap import Tap
 import glob
 
 class InferenceArgumentParser(Tap):
-    segment_id: list[str] =['20230925002745']
-    segment_path:str='./eval_scrolls'
-    model_path:str= 'outputs/vesuvius/pretraining_all/vesuvius-models/valid_20230827161847_0_fr_i3depoch=7.ckpt'
+    segment_id: list[str] =['20230509182749']
+    segment_path:str='./train_scrolls'
+    model_path:str= './checkpoints/timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt'
     out_path:str=""
     stride: int = 2
     start_idx:int=15
