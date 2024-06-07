@@ -75,7 +75,8 @@ class CFG:
     # lr = 1e-4 / warmup_factor
     lr = 1e-4 / warmup_factor
     min_lr = 1e-6
-    num_workers = 16
+    num_workers = 4
+    # num_workers = 16
     seed = 42
     # ============== augmentation =============
     valid_aug_list = [
@@ -307,8 +308,8 @@ def predict_fn(test_loader, model, device, test_xyxys,pred_shape):
 import gc
 
 if __name__ == "__main__":
-    model=RegressionPLModel.load_from_checkpoint(args.model_path,strict=False)
-    model.cuda()
+    model=RegressionPLModel.load_from_checkpoint(args.model_path, map_location=torch.device('cpu'), strict=False)
+    # model.cuda()
     model.eval()
 
     for fragment_id in args.segment_id:
