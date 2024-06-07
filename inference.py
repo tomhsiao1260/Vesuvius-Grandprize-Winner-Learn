@@ -138,10 +138,11 @@ def read_image_mask(fragment_id,start_idx=18,end_idx=38,rotation=0):
 
     return images,fragment_mask
 
-def get_img_splits(fragment_id,s,e,rotation=0):
+def get_img_splits(fragment_id, s, e, rotation=0):
     images = []
     xyxys = []
-    image,fragment_mask = read_image_mask(fragment_id,s,e,rotation)
+    image, fragment_mask = read_image_mask(fragment_id, s, e, rotation)
+    print(image.shape, fragment_mask.shape)
     # x1_list = list(range(0, image.shape[1]-CFG.tile_size+1, CFG.stride))
     # y1_list = list(range(0, image.shape[0]-CFG.tile_size+1, CFG.stride))
     # for y1 in y1_list:
@@ -313,10 +314,11 @@ if __name__ == "__main__":
     model.eval()
 
     preds=[]
+    rotation = 0
+    fragment_id = '20230509182749'
     start_f = 0
     end_f = start_f + 26
-    fragment_id = '20230509182749'
-    get_img_splits(fragment_id,start_f,end_f,r)
+    get_img_splits(fragment_id, start_f, end_f, rotation)
     # test_loader,test_xyxz,test_shape,fragment_mask=get_img_splits(fragment_id,start_f,end_f,r)
     # mask_pred= predict_fn(test_loader, model, device, test_xyxz,test_shape)
     # mask_pred=np.clip(np.nan_to_num(mask_pred),a_min=0,a_max=1)
