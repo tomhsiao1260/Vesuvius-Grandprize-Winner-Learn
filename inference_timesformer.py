@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from timesformer_pytorch import TimeSformer
 import torch
 from warmup_scheduler import GradualWarmupScheduler
-import wandb
 import random
 import gc
 import pytorch_lightning as pl
@@ -311,10 +310,7 @@ if __name__ == "__main__":
     model=RegressionPLModel.load_from_checkpoint(args.model_path,strict=False)
     model.cuda()
     model.eval()
-    wandb.init(
-        project="Vesuvius", 
-        name=f"ALL_scrolls_tta", 
-        )
+
     for fragment_id in args.segment_id:
         if os.path.exists(f"{args.segment_path}/{fragment_id}/layers/00.{args.format}"):
             preds=[]
@@ -329,11 +325,6 @@ if __name__ == "__main__":
 
                     preds.append(mask_pred)
 
-            img=wandb.Image(
-            preds[0], 
-            caption=f"{fragment_id}"
-            )
-            wandb.log({'predictions':img})
             gc.collect()
 
             if len(args.out_path) > 0:
@@ -348,4 +339,3 @@ if __name__ == "__main__":
     del mask_pred,test_loader,model
     torch.cuda.empty_cache()
     gc.collect()
-    wandb.finish()
