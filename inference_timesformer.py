@@ -189,7 +189,7 @@ class CustomDatasetTest(Dataset):
             data = self.transform(image=image)
             image = data['image'].unsqueeze(0)
         return image,xy
-
+    
 class RegressionPLModel(pl.LightningModule):
     def __init__(self,pred_shape,size=64,enc='',with_norm=False):
         super(RegressionPLModel, self).__init__()
@@ -308,13 +308,13 @@ def predict_fn(test_loader, model, device, test_xyxys,pred_shape):
 import gc
 
 if __name__ == "__main__":
-    model=RegressionPLModel.load_from_checkpoint(args.model_path, map_location=torch.device('cpu'), strict=False)
-    # model.cuda()
+    model=RegressionPLModel.load_from_checkpoint(args.model_path,strict=False)
+    model.cuda()
     model.eval()
-    # wandb.init(
-    #     project="Vesuvius", 
-    #     name=f"ALL_scrolls_tta", 
-    #     )
+    wandb.init(
+        project="Vesuvius", 
+        name=f"ALL_scrolls_tta", 
+        )
     for fragment_id in args.segment_id:
         if os.path.exists(f"{args.segment_path}/{fragment_id}/layers/00.{args.format}"):
             preds=[]
@@ -329,11 +329,11 @@ if __name__ == "__main__":
 
                     preds.append(mask_pred)
 
-            # img=wandb.Image(
-            # preds[0], 
-            # caption=f"{fragment_id}"
-            # )
-            # wandb.log({'predictions':img})
+            img=wandb.Image(
+            preds[0], 
+            caption=f"{fragment_id}"
+            )
+            wandb.log({'predictions':img})
             gc.collect()
 
             if len(args.out_path) > 0:
@@ -346,6 +346,6 @@ if __name__ == "__main__":
                 cv2.imwrite(os.path.join(args.out_path, f"{fragment_id}_prediction.png"), image_cv)
 
     del mask_pred,test_loader,model
-    # torch.cuda.empty_cache()
-    # gc.collect()
-    # wandb.finish()
+    torch.cuda.empty_cache()
+    gc.collect()
+    wandb.finish()
