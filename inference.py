@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import pytorch_lightning as pl
 from timesformer_pytorch import TimeSformer
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 segment_path = 'train_scrolls'
 fragment_id = '20230509182749'
@@ -12,6 +12,8 @@ checkpoint_path = 'checkpoints/timesformer_wild15_20230702185753_0_fr_i3depoch=1
 in_chans = 26
 tile_size = 64
 stride = tile_size // 3
+batch_size = 256
+num_workers = 4
 
 def read_image_mask(fragment_id, start_idx=18, end_idx=38, rotation=0):
   image_stack = []
@@ -49,11 +51,12 @@ def get_img_splits(fragment_id, start_idx, end_idx, rotation=0):
         images.append(image_stack[ymin:ymax, xmin:xmax])
         coords.append([xmin, ymin, xmax, ymax])
 
-  test_dataset = CustomDatasetTest(images, np.stack(coords))
+  coords = np.stack(coords)
+  test_dataset = CustomDatasetTest(images, coords)
+  test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True, drop_last=False)
+  image_shape = (image_stack.shape[0], image_stack.shape[1])
 
-  print('Dataset length:', len(test_dataset))
-  print('1st data coord:', test_dataset[0][1])
-  print('1st data shape:', test_dataset[0][0].shape)
+  return test_loader, coords, image_shape, fragment_mask
 
 class CustomDatasetTest(Dataset):
     def __init__(self, images, coords):
@@ -93,6 +96,7 @@ if __name__ == "__main__":
   start_idx = 0
   end_idx = start_idx + in_chans
 
-  get_img_splits(fragment_id, start_idx, end_idx)
+  test_loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
+  print(coords.shape, image_shape, fragment_mask.shape)
 
 
