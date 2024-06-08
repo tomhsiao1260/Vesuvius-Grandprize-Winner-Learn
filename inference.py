@@ -2,6 +2,7 @@ import cv2
 import torch
 import numpy as np
 import scipy.stats as st
+from tqdm.auto import tqdm
 import pytorch_lightning as pl
 from timesformer_pytorch import TimeSformer
 from torch.utils.data import Dataset, DataLoader
@@ -61,7 +62,8 @@ def get_img_splits(fragment_id, start_idx, end_idx, rotation=0):
         coords.append([xmin, ymin, xmax, ymax])
 
   coords = np.stack(coords)
-  test_dataset = CustomDatasetTest(images, coords)
+  # test_dataset = CustomDatasetTest(images, coords)
+  test_dataset = CustomDatasetTest(images[:1000], coords[:1000])
   test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True, drop_last=False)
   image_shape = (image_stack.shape[0], image_stack.shape[1])
 
@@ -99,18 +101,19 @@ class RegressionPLModel(pl.LightningModule):
     )
 
 if __name__ == "__main__":
-  # model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=torch.device('cpu'), strict=False)
-  # model.eval()
+  model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=torch.device('cpu'), strict=False)
+  model.eval()
 
-  # start_idx = 0
-  # end_idx = start_idx + in_chans
+  start_idx = 0
+  end_idx = start_idx + in_chans
 
-  # test_loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
+  test_loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
 
   kernel = gkern(size, 1)
   kernel = kernel / kernel.max()
-  print(kernel.shape)
 
-  cv2.imwrite('kernel.png', kernel * 255)
+  for step, (image, coord) in tqdm(enumerate(test_loader), total=len(test_loader)):
+    print('Batch image shape: ', image.shape)
+    print('Batch coord shape: ', coord.shape)
 
 

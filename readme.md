@@ -43,7 +43,7 @@ size：為 kernal 大小
 
 ## CustomDatasetTest
 
-建立資料集，基於 torch 的 Dataset，其中 __len__ 可以獲得批量資料的數量 (e.g. len(dataset))，__getitem__ 能獲得某筆指定的資料 (e.g. dataset[idx])，這個應用回傳的是單筆的 image_stack 和對應的 coord。定義好一個 dataset 後就可以放進 DataLoader 裡面，決定要怎麼批量訪問這些資料。
+建立資料集，基於 torch 的 Dataset，其中 __len__ 可以獲得批量資料的數量 (e.g. len(dataset))，__getitem__ 能獲得某筆指定的資料 (e.g. dataset[idx])，這個應用回傳的是單筆的 image_stack 和對應的 coord。定義好一個 dataset 後就可以放進 DataLoader 裡面，決定要怎麼批量訪問這些資料，另外這些資料會以 tensor 儲存。
 
 ## get_img_splits
 
