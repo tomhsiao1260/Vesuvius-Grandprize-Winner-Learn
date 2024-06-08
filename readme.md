@@ -43,6 +43,9 @@ stride：批量時的跨步大小
 images 是個列表，囤放了所有裁切後的 stack，每個小方塊大小為 (tile_size, tile_size, l)
 coords 是個列表，囤放了 images 資料所對應的資料座標，[xmin, ymin, xmax, ymax]
 
+## CustomDatasetTest
+
+建立資料集，基於 torch 的 Dataset，其中 __len__ 可以獲得批量資料的數量，__getitem__ 能獲得某筆指定的資料
 
 
 
