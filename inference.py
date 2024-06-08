@@ -4,13 +4,16 @@ import numpy as np
 import pytorch_lightning as pl
 from timesformer_pytorch import TimeSformer
 
-in_chans = 26
 segment_path = 'train_scrolls'
 fragment_id = '20230509182749'
 checkpoint_path = 'checkpoints/timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt'
 
+in_chans = 26
+tile_size = 64
+stride = tile_size // 3
+
 def read_image_mask(fragment_id, start_idx=18, end_idx=38, rotation=0):
-  images = []
+  image_stack = []
   mid = 65 // 2
   start = mid - in_chans // 2
   end = mid + in_chans // 2
@@ -21,13 +24,13 @@ def read_image_mask(fragment_id, start_idx=18, end_idx=38, rotation=0):
     pad1 = (256 - image.shape[1] % 256)
     image = np.pad(image, [(0, pad0), (0, pad1)], constant_values=0)
     image = np.clip(image, 0, 200)
-    images.append(image)
+    image_stack.append(image)
 
-  images = np.stack(images, axis=2)
+  image_stack = np.stack(image_stack, axis=2)
   fragment_mask = cv2.imread(f"{segment_path}/{fragment_id}/{fragment_id}_mask.png", 0)
   fragment_mask = np.pad(fragment_mask, [(0, pad0), (0, pad1)], constant_values=0)
 
-  return images, fragment_mask
+  return image_stack, fragment_mask
 
 class RegressionPLModel(pl.LightningModule):
   def __init__(self, pred_shape, size=64, enc='', with_norm=False):
@@ -54,7 +57,21 @@ if __name__ == "__main__":
   start_f = 0
   end_f = start_f + in_chans
 
-  images, fragment_mask = read_image_mask(fragment_id, start_f, end_f)
-  print(images.shape, fragment_mask.shape, np.max(images[:, :, 0]))
+  image_stack, fragment_mask = read_image_mask(fragment_id, start_f, end_f)
+
+  images = []
+  coords = []
+  x_list = list(range(0, image_stack.shape[1]-tile_size+1, stride))
+  y_list = list(range(0, image_stack.shape[0]-tile_size+1, stride))
+
+  for ymin in y_list:
+    for xmin in x_list:
+      ymax = ymin + tile_size
+      xmax = xmin + tile_size
+      if not np.any(fragment_mask[ymin:ymax, xmin:xmax]==0):
+        images.append(image_stack[ymin:ymax, xmin:xmax])
+        coords.append([xmin, ymin, xmax, ymax])
+
+  print(len(images), len(coords), images[0].shape, coords[0])
 
 
