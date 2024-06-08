@@ -1,6 +1,7 @@
 import cv2
 import torch
 import numpy as np
+import scipy.stats as st
 import pytorch_lightning as pl
 from timesformer_pytorch import TimeSformer
 from torch.utils.data import Dataset, DataLoader
@@ -14,6 +15,14 @@ tile_size = 64
 stride = tile_size // 3
 batch_size = 256
 num_workers = 4
+size = 64
+
+def gkern(kernlen=21, nsig=3):
+    """Returns a 2D Gaussian kernel."""
+    x = np.linspace(-nsig, nsig, kernlen+1)
+    kern1d = np.diff(st.norm.cdf(x))
+    kern2d = np.outer(kern1d, kern1d)
+    return kern2d / kern2d.sum()
 
 def read_image_mask(fragment_id, start_idx=18, end_idx=38, rotation=0):
   image_stack = []
@@ -90,13 +99,18 @@ class RegressionPLModel(pl.LightningModule):
     )
 
 if __name__ == "__main__":
-  model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=torch.device('cpu'), strict=False)
-  model.eval()
+  # model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=torch.device('cpu'), strict=False)
+  # model.eval()
 
-  start_idx = 0
-  end_idx = start_idx + in_chans
+  # start_idx = 0
+  # end_idx = start_idx + in_chans
 
-  test_loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
-  print(coords.shape, image_shape, fragment_mask.shape)
+  # test_loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
+
+  kernel = gkern(size, 1)
+  kernel = kernel / kernel.max()
+  print(kernel.shape)
+
+  cv2.imwrite('kernel.png', kernel * 255)
 
 

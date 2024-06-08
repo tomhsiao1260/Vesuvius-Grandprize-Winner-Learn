@@ -35,6 +35,7 @@ tile_size：批量時每筆資料的窗戶大小
 stride：批量時的跨步大小
 batch_size：一次要批進多少筆資料
 num_workers：想使用的 worker 數量
+size：為 kernal 大小
 
 ## read_image_mask
 
@@ -53,6 +54,12 @@ coords 是個列表，囤放了 images 資料所對應的資料座標，[xmin, y
 image_shape 是 padding 後圖片的長寬大小 (h, w)
 fragment_mask 就是 read_image_mask 回傳的東西
 test_loader 是最後建立好的 DataLoader
+
+## gkern
+
+產生一個二維高斯函數，作為 kernal
+
+
 
 
 
