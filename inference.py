@@ -32,6 +32,24 @@ def read_image_mask(fragment_id, start_idx=18, end_idx=38, rotation=0):
 
   return image_stack, fragment_mask
 
+def get_img_splits(fragment_id, start_idx, end_idx, rotation=0):
+  image_stack, fragment_mask = read_image_mask(fragment_id, start_idx, end_idx)
+
+  images = []
+  coords = []
+  x_list = list(range(0, image_stack.shape[1]-tile_size+1, stride))
+  y_list = list(range(0, image_stack.shape[0]-tile_size+1, stride))
+
+  for ymin in y_list:
+    for xmin in x_list:
+      ymax = ymin + tile_size
+      xmax = xmin + tile_size
+      if not np.any(fragment_mask[ymin:ymax, xmin:xmax]==0):
+        images.append(image_stack[ymin:ymax, xmin:xmax])
+        coords.append([xmin, ymin, xmax, ymax])
+
+  print(len(images), len(coords), images[0].shape, coords[0])
+
 class RegressionPLModel(pl.LightningModule):
   def __init__(self, pred_shape, size=64, enc='', with_norm=False):
     super(RegressionPLModel, self).__init__()
@@ -54,24 +72,9 @@ if __name__ == "__main__":
   model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=torch.device('cpu'), strict=False)
   model.eval()
 
-  start_f = 0
-  end_f = start_f + in_chans
+  start_idx = 0
+  end_idx = start_idx + in_chans
 
-  image_stack, fragment_mask = read_image_mask(fragment_id, start_f, end_f)
-
-  images = []
-  coords = []
-  x_list = list(range(0, image_stack.shape[1]-tile_size+1, stride))
-  y_list = list(range(0, image_stack.shape[0]-tile_size+1, stride))
-
-  for ymin in y_list:
-    for xmin in x_list:
-      ymax = ymin + tile_size
-      xmax = xmin + tile_size
-      if not np.any(fragment_mask[ymin:ymax, xmin:xmax]==0):
-        images.append(image_stack[ymin:ymax, xmin:xmax])
-        coords.append([xmin, ymin, xmax, ymax])
-
-  print(len(images), len(coords), images[0].shape, coords[0])
+  get_img_splits(fragment_id, start_idx, end_idx)
 
 
