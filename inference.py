@@ -24,6 +24,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from tap import Tap
 import glob
 
+device_type = 'cpu'
+device = torch.device(device_type)
+
 class InferenceArgumentParser(Tap):
     segment_id: list[str] =['20230509182749']
     segment_path:str='./train_scrolls'
@@ -64,7 +67,8 @@ class CFG:
     stride = tile_size // 3
 
     train_batch_size = 256 # 32
-    valid_batch_size = 256
+    valid_batch_size = 1
+    # valid_batch_size = 256
     use_amp = True
 
     scheduler = 'GradualWarmupSchedulerV2'
@@ -114,44 +118,44 @@ def read_image_mask(fragment_id, start_idx=18, end_idx=38, rotation=0):
         pad0 = (256 - image.shape[0] % 256)
         pad1 = (256 - image.shape[1] % 256)
         image = np.pad(image, [(0, pad0), (0, pad1)], constant_values=0)
-        image=np.clip(image,0,200)
+        image = np.clip(image, 0, 200)
         images.append(image)
     images = np.stack(images, axis=2)
 
-    fragment_mask=cv2.imread(CFG.comp_dataset_path + f"{args.segment_path}/{fragment_id}/{fragment_id}_mask.png", 0)
+    fragment_mask = cv2.imread(CFG.comp_dataset_path + f"{args.segment_path}/{fragment_id}/{fragment_id}_mask.png", 0)
     fragment_mask = np.pad(fragment_mask, [(0, pad0), (0, pad1)], constant_values=0)
 
-    return images,fragment_mask
+    return images, fragment_mask
 
 def get_img_splits(fragment_id, s, e, rotation=0):
     images = []
     xyxys = []
     image, fragment_mask = read_image_mask(fragment_id, s, e, rotation)
-    print(image.shape, fragment_mask.shape)
-    # x1_list = list(range(0, image.shape[1]-CFG.tile_size+1, CFG.stride))
-    # y1_list = list(range(0, image.shape[0]-CFG.tile_size+1, CFG.stride))
-    # for y1 in y1_list:
-    #     for x1 in x1_list:
-    #         y2 = y1 + CFG.tile_size
-    #         x2 = x1 + CFG.tile_size
-    #         if not np.any(fragment_mask[y1:y2, x1:x2]==0):
-    #             images.append(image[y1:y2, x1:x2])
-    #             xyxys.append([x1, y1, x2, y2])
-    # test_dataset = CustomDatasetTest(images,np.stack(xyxys), CFG,transform=A.Compose([
-    #     A.Resize(CFG.size, CFG.size),
-    #     A.Normalize(
-    #         mean= [0] * CFG.in_chans,
-    #         std= [1] * CFG.in_chans
-    #     ),
-    #     ToTensorV2(transpose_mask=True),
-    # ]))
+    x1_list = list(range(0, image.shape[1]-CFG.tile_size+1, CFG.stride))
+    y1_list = list(range(0, image.shape[0]-CFG.tile_size+1, CFG.stride))
+    for y1 in y1_list:
+        for x1 in x1_list:
+            y2 = y1 + CFG.tile_size
+            x2 = x1 + CFG.tile_size
+            if not np.any(fragment_mask[y1:y2, x1:x2]==0):
+                images.append(image[y1:y2, x1:x2])
+                xyxys.append([x1, y1, x2, y2])
+    # test_dataset = CustomDatasetTest(images[:256], np.stack(xyxys)[:256], CFG)
+    test_dataset = CustomDatasetTest(images[:10],np.stack(xyxys)[:10], CFG,transform=A.Compose([
+        A.Resize(CFG.size, CFG.size),
+        A.Normalize(
+            mean= [0] * CFG.in_chans,
+            std= [1] * CFG.in_chans
+        ),
+        ToTensorV2(transpose_mask=True),
+    ]))
 
-    # test_loader = DataLoader(test_dataset,
-    #                           batch_size=CFG.valid_batch_size,
-    #                           shuffle=False,
-    #                           num_workers=CFG.num_workers, pin_memory=True, drop_last=False,
-    #                           )
-    # return test_loader, np.stack(xyxys),(image.shape[0],image.shape[1]),fragment_mask
+    test_loader = DataLoader(test_dataset,
+                              batch_size=CFG.valid_batch_size,
+                              shuffle=False,
+                              num_workers=CFG.num_workers, pin_memory=True, drop_last=False,
+                              )
+    return test_loader, np.stack(xyxys), (image.shape[0], image.shape[1]), fragment_mask
 
 def get_transforms(data, cfg):
     if data == 'valid':
@@ -203,10 +207,10 @@ class RegressionPLModel(pl.LightningModule):
 
     def forward(self, x):
         if x.ndim==4:
-            x=x[:,None]
+            x=x[:, None]
         if self.hparams.with_norm:
-            x=self.normalization(x)
-        x = self.backbone(torch.permute(x, (0, 2, 1,3,4)))
+            x = self.normalization(x)
+        x = self.backbone(torch.permute(x, (0, 2, 1, 3, 4)))
         x=x.view(-1,1,4,4)        
         return x
     def training_step(self, batch, batch_idx):
@@ -282,9 +286,9 @@ def predict_fn(test_loader, model, device, test_xyxys,pred_shape):
         images = images.to(device)
         batch_size = images.size(0)
         with torch.no_grad():
-            with torch.autocast(device_type="cuda"):
+            with torch.autocast(device_type=device_type):
                 y_preds = model(images)
-        y_preds = torch.sigmoid(y_preds).to('cpu')
+        y_preds = torch.sigmoid(y_preds).to(device_type)
         for i, (x1, y1, x2, y2) in enumerate(xys):
             mask_pred[y1:y2, x1:x2] += np.multiply(F.interpolate(y_preds[i].unsqueeze(0).float(),scale_factor=16,mode='bilinear').squeeze(0).squeeze(0).numpy(),kernel)
             mask_count[y1:y2, x1:x2] += np.ones((CFG.size, CFG.size))
@@ -294,7 +298,7 @@ def predict_fn(test_loader, model, device, test_xyxys,pred_shape):
 import gc
 
 if __name__ == "__main__":
-    model=RegressionPLModel.load_from_checkpoint(args.model_path, map_location=torch.device('cpu'), strict=False)
+    model=RegressionPLModel.load_from_checkpoint(args.model_path, map_location=device, strict=False)
     # model.cuda()
     model.eval()
 
@@ -303,25 +307,20 @@ if __name__ == "__main__":
     fragment_id = '20230509182749'
     start_f = 0
     end_f = start_f + 26
-    get_img_splits(fragment_id, start_f, end_f, rotation)
-    # test_loader,test_xyxz,test_shape,fragment_mask=get_img_splits(fragment_id,start_f,end_f,r)
-    # mask_pred= predict_fn(test_loader, model, device, test_xyxz,test_shape)
-    # mask_pred=np.clip(np.nan_to_num(mask_pred),a_min=0,a_max=1)
-    # mask_pred/=mask_pred.max()
+    test_loader,test_xyxz,test_shape,fragment_mask = get_img_splits(fragment_id,start_f,end_f)
 
-    # preds.append(mask_pred)
+    mask_pred = predict_fn(test_loader, model, device, test_xyxz, test_shape)
+    mask_pred=np.clip(np.nan_to_num(mask_pred),a_min=0,a_max=1)
+    mask_pred/=mask_pred.max()
 
-    # gc.collect()
+    preds.append(mask_pred)
 
-    # if len(args.out_path) > 0:
-    #     # CV2 image
-    #     image_cv = (mask_pred * 255).astype(np.uint8)
-    #     try:
-    #         os.makedirs(args.out_path,exist_ok=True)
-    #     except:
-    #         pass
-    #     cv2.imwrite(os.path.join(args.out_path, f"{fragment_id}_prediction.png"), image_cv)
+    gc.collect()
 
-    # del mask_pred,test_loader,model
-    # torch.cuda.empty_cache()
-    # gc.collect()
+    # CV2 image
+    image_cv = (mask_pred * 255).astype(np.uint8)
+    cv2.imwrite(f"{fragment_id}_prediction.png", image_cv)
+
+    del mask_pred, test_loader, model
+    torch.cuda.empty_cache()
+    gc.collect()
