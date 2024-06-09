@@ -16,3 +16,6 @@ wandb/
 
 /pictures/*
 !/pictures/.gitkeep
+
+*.png
+
