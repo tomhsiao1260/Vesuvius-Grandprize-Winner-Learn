@@ -39,9 +39,9 @@ class CFG:
     tile_size = 64
     stride = tile_size // 3
 
-    num_data = 1
-    valid_batch_size = 1
+    valid_batch_size = 32
     # valid_batch_size = 256
+    num_data = 3 * valid_batch_size
 
     num_workers = 4
     # num_workers = 16
@@ -107,12 +107,12 @@ class CustomDatasetTest(Dataset):
     
     def __getitem__(self, idx):
         image = self.images[idx]
-        xy=self.xyxys[idx]
+        xy = self.xyxys[idx]
         if self.transform:
             data = self.transform(image=image)
             image = data['image'].unsqueeze(0)
-        return image,xy
-    
+        return image, xy
+
 class RegressionPLModel(pl.LightningModule):
     def __init__(self, pred_shape, size=64, enc='', with_norm=False):
         super(RegressionPLModel, self).__init__()
@@ -134,7 +134,7 @@ class RegressionPLModel(pl.LightningModule):
     def forward(self, x):
         if x.ndim==4: x = x[:, None]
         x = self.backbone(torch.permute(x, (0, 2, 1, 3, 4)))
-        x = x.view(-1,1,4,4)        
+        x = x.view(-1, 1, 4, 4)        
         return x
 
 def predict_fn(test_loader, model, device, test_xyxys,pred_shape):
@@ -144,6 +144,8 @@ def predict_fn(test_loader, model, device, test_xyxys,pred_shape):
     kernel = kernel / kernel.max()
     model.eval()
 
+    test_img = np.zeros(pred_shape)
+
     for step, (images,xys) in tqdm(enumerate(test_loader),total=len(test_loader)):
         images = images.to(device)
         batch_size = images.size(0)
@@ -151,10 +153,14 @@ def predict_fn(test_loader, model, device, test_xyxys,pred_shape):
             with torch.autocast(device_type=device_type):
                 y_preds = model(images)
         y_preds = torch.sigmoid(y_preds).to('cpu')
-        print('y: ', y_preds)
+
         for i, (x1, y1, x2, y2) in enumerate(xys):
             mask_pred[y1:y2, x1:x2] += np.multiply(F.interpolate(y_preds[i].unsqueeze(0).float(), scale_factor=16,mode='bilinear').squeeze(0).squeeze(0).numpy(), kernel)
             mask_count[y1:y2, x1:x2] += np.ones((CFG.size, CFG.size))
+
+        test_img = mask_pred / mask_count
+        test_img = (test_img * 255).astype(np.uint8)
+        cv2.imwrite(f"{fragment_id}_{step}_prediction.png", test_img)
 
     mask_pred /= mask_count
     return mask_pred
@@ -168,7 +174,7 @@ if __name__ == "__main__":
     rotation = 0
     start_f = 0
     end_f = start_f + 26
-    test_loader,test_xyxz,test_shape,fragment_mask = get_img_splits(fragment_id,start_f,end_f)
+    test_loader,test_xyxz,test_shape,fragment_mask = get_img_splits(fragment_id, start_f, end_f)
 
     mask_pred = predict_fn(test_loader, model, device, test_xyxz, test_shape)
     mask_pred = np.clip(np.nan_to_num(mask_pred),a_min=0,a_max=1)
