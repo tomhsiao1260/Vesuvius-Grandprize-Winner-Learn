@@ -8,15 +8,20 @@ from timesformer_pytorch import TimeSformer
 from torch.utils.data import Dataset, DataLoader
 
 segment_path = 'train_scrolls'
-fragment_id = '20230509182749'
+# fragment_id = '20230509182749'
+fragment_id = 'pi_small'
 checkpoint_path = 'checkpoints/timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt'
 
 in_chans = 26
 tile_size = 64
 stride = tile_size // 3
-batch_size = 256
+batch_size = 8
+# batch_size = 256
 num_workers = 4
 size = 64
+
+device_type = 'cpu'
+device = torch.device(device_type)
 
 def gkern(kernlen=21, nsig=3):
     """Returns a 2D Gaussian kernel."""
@@ -62,12 +67,12 @@ def get_img_splits(fragment_id, start_idx, end_idx, rotation=0):
         coords.append([xmin, ymin, xmax, ymax])
 
   coords = np.stack(coords)
-  # test_dataset = CustomDatasetTest(images, coords)
-  test_dataset = CustomDatasetTest(images[:1000], coords[:1000])
-  test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True, drop_last=False)
+  # dataset = CustomDatasetTest(images, coords)
+  dataset = CustomDatasetTest(images[:1000], coords[:1000])
+  loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True, drop_last=False)
   image_shape = (image_stack.shape[0], image_stack.shape[1])
 
-  return test_loader, coords, image_shape, fragment_mask
+  return loader, coords, image_shape, fragment_mask
 
 class CustomDatasetTest(Dataset):
     def __init__(self, images, coords):
@@ -101,19 +106,19 @@ class RegressionPLModel(pl.LightningModule):
     )
 
 if __name__ == "__main__":
-  model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=torch.device('cpu'), strict=False)
+  model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=device, strict=False)
   model.eval()
 
-  start_idx = 0
+  if (device_type == 'cuda'): model.cuda()
+
+  start_idx = 17
   end_idx = start_idx + in_chans
 
-  test_loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
+  loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
 
   kernel = gkern(size, 1)
   kernel = kernel / kernel.max()
 
-  for step, (image, coord) in tqdm(enumerate(test_loader), total=len(test_loader)):
+  for step, (image, coord) in tqdm(enumerate(loader), total=len(loader)):
     print('Batch image shape: ', image.shape)
     print('Batch coord shape: ', coord.shape)
-
-
