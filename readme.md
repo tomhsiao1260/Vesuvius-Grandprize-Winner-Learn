@@ -39,21 +39,23 @@ size：為 kernal 大小
 
 ## read_image_mask
 
-回傳 fragment_mask 和 image_stack，其中 fragment_mask 大小為 (h, w) 是 mask 資料，image_stack 大小為 (h, w, l) 是 layers 資料夾下產生的 stack，數值被裁切到介於 0~200 之間，l 是以中央為基準取出的層數。此外，這兩種資料的 w, h 都被 padding 到 256 的整數倍以方便批量載入數據
+回傳 fragment_mask 和 image_stack，其中 fragment_mask 大小為 (h, w) 是 mask 資料，image_stack 大小為 (h, w, layer) 是 layers 資料夾下產生的 stack，數值被裁切到介於 0~200 之間，layer 是以中央為基準取出的層數。此外，這兩種資料的 w, h 都被 padding 到 256 的整數倍以方便批量載入數據
 
 ## CustomDatasetTest
 
-建立資料集，基於 torch 的 Dataset，其中 __len__ 可以獲得批量資料的數量 (e.g. len(dataset))，__getitem__ 能獲得某筆指定的資料 (e.g. dataset[idx])，這個應用回傳的是單筆的 image_stack 和對應的 coord。定義好一個 dataset 後就可以放進 DataLoader 裡面，決定要怎麼批量訪問這些資料，另外這些資料會以 tensor 儲存。
+建立資料集，基於 torch 的 Dataset，其中 __len__ 可以獲得批量資料的數量 (e.g. len(dataset))，__getitem__ 能獲得某筆指定的資料 (e.g. dataset[idx])，這個應用回傳的是單筆的 image_stack 和對應的 coord。最後定義好一個 dataset 後就能放進 DataLoader 裡，決定要怎麼批量訪問這些資料，另外這些資料會以 tensor 儲存。
+
+比較特別的是，資料本身有透過 albumentations 套件做ㄧ些轉換，像是 resize, normalize, to tensor， unsqueeze，為的是滿足 model 預測所需的輸入資料。細節上，會讓原本資料從 (size, size, layer) 變為 (1, layer, size, size)
 
 ## get_img_splits
 
-把資料裁切後建立 Dataset, DataLoader，並回傳 test_loader, coords, image_shape, fragment_mask
+把資料裁切後建立 Dataset, DataLoader，並回傳 loader, coords, image_shape, fragment_mask
 
-images 是個列表，囤放了所有裁切後的 stack，每個小方塊大小為 (tile_size, tile_size, l)
+images 是個列表，囤放了所有裁切後的 stack，每個小方塊大小為 (tile_size, tile_size, layer)
 coords 是個列表，囤放了 images 資料所對應的資料座標，[xmin, ymin, xmax, ymax]，最後以 numpy 回傳
 image_shape 是 padding 後圖片的長寬大小 (h, w)
 fragment_mask 就是 read_image_mask 回傳的東西
-test_loader 是最後建立好的 DataLoader
+loader 是最後建立好的 DataLoader
 
 ## gkern
 

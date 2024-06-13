@@ -6,6 +6,8 @@ from tqdm.auto import tqdm
 import pytorch_lightning as pl
 from timesformer_pytorch import TimeSformer
 from torch.utils.data import Dataset, DataLoader
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 segment_path = 'train_scrolls'
 # fragment_id = '20230509182749'
@@ -66,18 +68,27 @@ def get_img_splits(fragment_id, start_idx, end_idx, rotation=0):
         images.append(image_stack[ymin:ymax, xmin:xmax])
         coords.append([xmin, ymin, xmax, ymax])
 
+  transform = A.Compose([
+    A.Resize(size, size),
+    A.Normalize(mean= [0] * in_chans, std= [1] * in_chans),
+    ToTensorV2(transpose_mask=True),
+  ])
+
   coords = np.stack(coords)
-  # dataset = CustomDatasetTest(images, coords)
-  dataset = CustomDatasetTest(images[:1000], coords[:1000])
+  dataset = CustomDatasetTest(images, coords, transform=transform)
+  # dataset = CustomDatasetTest(images[:1000], coords[:1000], transform=transform)
   loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True, drop_last=False)
   image_shape = (image_stack.shape[0], image_stack.shape[1])
+
+  dataset[0]
 
   return loader, coords, image_shape, fragment_mask
 
 class CustomDatasetTest(Dataset):
-    def __init__(self, images, coords):
+    def __init__(self, images, coords, transform=None):
         self.images = images
         self.coords = coords
+        self.transform = transform
 
     def __len__(self):
         return len(self.images)
@@ -85,6 +96,12 @@ class CustomDatasetTest(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
         coord = self.coords[idx]
+        print('transform 0: ', image.shape)
+        if self.transform:
+          data = self.transform(image=image)
+          image = data['image'].unsqueeze(0) 
+          print('transform 1: ', data['image'].shape) 
+        print('transform 2: ', image.shape)
         return image, coord
 
 class RegressionPLModel(pl.LightningModule):
@@ -119,6 +136,6 @@ if __name__ == "__main__":
   kernel = gkern(size, 1)
   kernel = kernel / kernel.max()
 
-  for step, (image, coord) in tqdm(enumerate(loader), total=len(loader)):
-    print('Batch image shape: ', image.shape)
-    print('Batch coord shape: ', coord.shape)
+  # for step, (image, coord) in tqdm(enumerate(loader), total=len(loader)):
+  #   print('Batch image shape: ', image.shape)
+  #   print('Batch coord shape: ', coord.shape)
