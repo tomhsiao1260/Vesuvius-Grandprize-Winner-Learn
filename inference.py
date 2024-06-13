@@ -17,8 +17,7 @@ device = torch.device(device_type)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 segment_path = 'train_scrolls'
-fragment_id = 'pi_small'
-# fragment_id = '20230509182749'
+fragment_id = 'pi'
 model_path = 'checkpoints/timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt'
 
 def gkern(kernlen=21, nsig=3):
@@ -159,12 +158,15 @@ def predict_fn(loader, model, device, image_shape):
       mask_count[y1:y2, x1:x2] += np.ones((CFG.size, CFG.size))
 
     filename = f"./predict/{fragment_id}_{step}.png"
-    image_save(filename, mask_pred / mask_count)
+    image_save(filename, mask_pred.copy(), mask_count.copy())
 
   filename = f"./predict/{fragment_id}.png"
-  image_save(filename, mask_pred / mask_count)
+  image_save(filename, mask_pred.copy(), mask_count.copy())
 
-def image_save(filename, data):
+def image_save(filename, mask_pred, mask_count):
+  mask_count[mask_count == 0] = 1
+
+  data = mask_pred / mask_count
   data = np.clip(np.nan_to_num(data), a_min=0, a_max=1)
   data /= data.max()
   data = (data * 255).astype(np.uint8)
