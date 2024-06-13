@@ -65,13 +65,15 @@ loader 是最後建立好的 DataLoader
 
 ## gkern
 
-產生一個二維高斯函數，作為 kernal
+產生一個二維高斯函數，作為 kernal，大小為 (size, size)
 
 ## predict_fn
 
 首先，`torch.no_grad` 會先把梯度下降關掉，`torch.autocast` 則是自動選擇必要的浮點數，然後就能夠把資料批量的丟給 model 預測。
 
-也就是呼叫 `model(images)` 方法，這會執行 model 內部的 forward 方法，這個方法先把原本的資料轉換為 (batch_size, layer, 1, size, size)，作為 `TimeSformer` 的輸入，輸出會是 (batch_size, patch_size)，最後再轉為 (..., 1, 4, 4) 的大小，然後經過一個 `tourch.sigmoid` 函數作為輸出結果
+也就是呼叫 `model(images)` 方法，這會執行 model 內部的 forward 方法，這個方法先把原本的資料轉換為 (batch_size, layer, 1, size, size)，作為 `TimeSformer` 的輸入，輸出會是 (batch_size, patch_size)，最後再轉為 (batch_size, 1, 4, 4) 的大小，然後經過一個 `tourch.sigmoid` 函數作為輸出結果
+
+這些其實就是每個對應座標下的預測結果，大小為 (4, 4) 的二維圖片，之後會透過 `bilinear` 外插回 (size, size) 大小，然後再與 kernal 作用，成為最終該區域的局部輸出。
 
 
 

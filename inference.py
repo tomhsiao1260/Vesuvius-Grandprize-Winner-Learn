@@ -4,6 +4,7 @@ import numpy as np
 import scipy.stats as st
 from tqdm.auto import tqdm
 import pytorch_lightning as pl
+import torch.nn.functional as F
 from timesformer_pytorch import TimeSformer
 from torch.utils.data import Dataset, DataLoader
 import albumentations as A
@@ -120,14 +121,32 @@ class RegressionPLModel(pl.LightningModule):
     )
 
   def forward(self, x):
-    print('Batch image shape: ', x.shape)
     if x.ndim==4: x=x[:,None]
-    print('TimeSformer input shape: ', torch.permute(x, (0, 2, 1, 3, 4)).shape)
     x = self.backbone(torch.permute(x, (0, 2, 1, 3, 4)))
-    print('TimeSformer output shape: ', x.shape)
-    x = x.view(-1, 1, 4, 4)   
-    print('Reshape shape: ', x.shape)     
+    x = x.view(-1, 1, 4, 4)      
     return x
+
+def predict_fn(loader, model, device, image_shape):
+  kernel = gkern(size, 1)
+  kernel = kernel / kernel.max()
+
+  print('Kernal shape: ', kernel.shape)
+
+  mask_pred = np.zeros(image_shape)
+  mask_count = np.zeros(image_shape)
+
+  for step, (images, coords) in tqdm(enumerate(loader), total=len(loader)):
+    images = images.to(device)
+    batch_size = images.size(0)
+
+    with torch.no_grad():
+      with torch.autocast(device_type=device_type):
+        y_preds = model(images)
+    y_preds = torch.sigmoid(y_preds).to('cpu')
+
+    for i, (x1, y1, x2, y2) in enumerate(coords):
+      result = np.multiply(F.interpolate(y_preds[i].unsqueeze(0).float(), scale_factor=16, mode='bilinear').squeeze(0).squeeze(0).numpy(), kernel)
+      print('Result shape: ', result.shape)
 
 if __name__ == "__main__":
   model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=device, strict=False)
@@ -140,14 +159,4 @@ if __name__ == "__main__":
 
   loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
 
-  kernel = gkern(size, 1)
-  kernel = kernel / kernel.max()
-
-  for step, (images, coords) in tqdm(enumerate(loader), total=len(loader)):
-    images = images.to(device)
-    batch_size = images.size(0)
-
-    with torch.no_grad():
-      with torch.autocast(device_type=device_type):
-        y_preds = model(images)
-    y_preds = torch.sigmoid(y_preds).to('cpu')
+  predict_fn(loader, model, device, image_shape)
