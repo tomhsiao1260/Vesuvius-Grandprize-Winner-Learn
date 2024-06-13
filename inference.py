@@ -2,16 +2,12 @@ import os
 import cv2
 import gc
 import torch
-import random
 import numpy as np
-import torch.nn as nn
 import scipy.stats as st
 from tqdm.auto import tqdm
 import pytorch_lightning as pl
 import torch.nn.functional as F
 from timesformer_pytorch import TimeSformer
-from torch.utils.data import DataLoader
-import segmentation_models_pytorch as smp
 from torch.utils.data import DataLoader, Dataset
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -41,7 +37,6 @@ class CFG:
 
   batch_size = 8
   # batch_size = 256
-  num_data = 3 * batch_size
 
   num_workers = 4
   # num_workers = 16
@@ -109,46 +104,47 @@ class CustomDatasetTest(Dataset):
   def __getitem__(self, idx):
     image = self.images[idx]   
     coord = self.coords[idx]
+
     if self.transform:
       data = self.transform(image=image)    
       image = data['image'].unsqueeze(0)   
+
     return image, coord
 
 class RegressionPLModel(pl.LightningModule):
-    def __init__(self, pred_shape, size=64, enc='', with_norm=False):
-        super(RegressionPLModel, self).__init__()
-        self.save_hyperparameters()
-        self.backbone=TimeSformer(
-                dim = 512,
-                image_size = 64,
-                patch_size = 16,
-                num_frames = 30,
-                num_classes = 16,
-                channels=1,
-                depth = 8,
-                heads = 6,
-                dim_head =  64,
-                attn_dropout = 0.1,
-                ff_dropout = 0.1
-            )
+  def __init__(self, pred_shape, size=64, enc='', with_norm=False):
+    super(RegressionPLModel, self).__init__()
+    self.save_hyperparameters()
+    self.backbone = TimeSformer(
+      dim = 512,
+      image_size = 64,
+      patch_size = 16,
+      num_frames = 30,
+      num_classes = 16,
+      channels=1,
+      depth = 8,
+      heads = 6,
+      dim_head =  64,
+      attn_dropout = 0.1,
+      ff_dropout = 0.1
+    )
 
-    def forward(self, x):
-        if x.ndim==4: x = x[:, None]
-        x = self.backbone(torch.permute(x, (0, 2, 1, 3, 4)))
-        x = x.view(-1, 1, 4, 4)  
-        return x
+  def forward(self, x):
+    if x.ndim==4: x=x[:,None]
+    x = self.backbone(torch.permute(x, (0, 2, 1, 3, 4)))
+    x = x.view(-1, 1, 4, 4)      
+    return x
 
-def predict_fn(loader, model, device, coords, image_shape):
+def predict_fn(loader, model, device, image_shape):
   kernel = gkern(CFG.size, 1)
   kernel = kernel / kernel.max()
 
-  img_pred = np.zeros(image_shape)
   mask_pred = np.zeros(image_shape)
   mask_count = np.zeros(image_shape)
 
   if not os.path.exists('predict'): os.makedirs('predict')
 
-  for step, (images, coord) in tqdm(enumerate(loader), total=len(loader)):
+  for step, (images, coords) in tqdm(enumerate(loader), total=len(loader)):
     images = images.to(device)
     batch_size = images.size(0)
 
@@ -157,7 +153,7 @@ def predict_fn(loader, model, device, coords, image_shape):
         y_preds = model(images)
     y_preds = torch.sigmoid(y_preds).to('cpu')
 
-    for i, (x1, y1, x2, y2) in enumerate(coord):
+    for i, (x1, y1, x2, y2) in enumerate(coords):
       # mask_pred[y1:y2, x1:x2] += images[i, :, 12, :, :].squeeze().numpy()
       mask_pred[y1:y2, x1:x2] += np.multiply(F.interpolate(y_preds[i].unsqueeze(0).float(), scale_factor=16, mode='bilinear').squeeze(0).squeeze(0).numpy(), kernel)
       mask_count[y1:y2, x1:x2] += np.ones((CFG.size, CFG.size))
@@ -179,12 +175,11 @@ if __name__ == "__main__":
   if (device_type == 'cuda'): model.cuda()
   model.eval()
 
-  rotation = 0
   start_idx = 17
   end_idx = start_idx + 26
   loader, coords, image_shape, fragment_mask = get_img_splits(fragment_id, start_idx, end_idx)
 
-  predict_fn(loader, model, device, coords, image_shape)
+  predict_fn(loader, model, device, image_shape)
 
   del loader, model
   torch.cuda.empty_cache()
