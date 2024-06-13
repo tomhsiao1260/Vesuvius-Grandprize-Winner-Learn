@@ -80,8 +80,6 @@ def get_img_splits(fragment_id, start_idx, end_idx, rotation=0):
   loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True, drop_last=False)
   image_shape = (image_stack.shape[0], image_stack.shape[1])
 
-  dataset[0]
-
   return loader, coords, image_shape, fragment_mask
 
 class CustomDatasetTest(Dataset):
@@ -96,12 +94,11 @@ class CustomDatasetTest(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
         coord = self.coords[idx]
-        print('transform 0: ', image.shape)
+
         if self.transform:
           data = self.transform(image=image)
           image = data['image'].unsqueeze(0) 
-          print('transform 1: ', data['image'].shape) 
-        print('transform 2: ', image.shape)
+
         return image, coord
 
 class RegressionPLModel(pl.LightningModule):
@@ -122,6 +119,16 @@ class RegressionPLModel(pl.LightningModule):
       ff_dropout = 0.1
     )
 
+  def forward(self, x):
+    print('Batch image shape: ', x.shape)
+    if x.ndim==4: x=x[:,None]
+    print('TimeSformer input shape: ', torch.permute(x, (0, 2, 1, 3, 4)).shape)
+    x = self.backbone(torch.permute(x, (0, 2, 1, 3, 4)))
+    print('TimeSformer output shape: ', x.shape)
+    x = x.view(-1, 1, 4, 4)   
+    print('Reshape shape: ', x.shape)     
+    return x
+
 if __name__ == "__main__":
   model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=device, strict=False)
   model.eval()
@@ -136,6 +143,11 @@ if __name__ == "__main__":
   kernel = gkern(size, 1)
   kernel = kernel / kernel.max()
 
-  # for step, (image, coord) in tqdm(enumerate(loader), total=len(loader)):
-  #   print('Batch image shape: ', image.shape)
-  #   print('Batch coord shape: ', coord.shape)
+  for step, (images, coords) in tqdm(enumerate(loader), total=len(loader)):
+    images = images.to(device)
+    batch_size = images.size(0)
+
+    with torch.no_grad():
+      with torch.autocast(device_type=device_type):
+        y_preds = model(images)
+    y_preds = torch.sigmoid(y_preds).to('cpu')

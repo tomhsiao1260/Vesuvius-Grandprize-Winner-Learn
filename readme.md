@@ -43,9 +43,15 @@ size：為 kernal 大小
 
 ## CustomDatasetTest
 
-建立資料集，基於 torch 的 Dataset，其中 __len__ 可以獲得批量資料的數量 (e.g. len(dataset))，__getitem__ 能獲得某筆指定的資料 (e.g. dataset[idx])，這個應用回傳的是單筆的 image_stack 和對應的 coord。最後定義好一個 dataset 後就能放進 DataLoader 裡，決定要怎麼批量訪問這些資料，另外這些資料會以 tensor 儲存。
+建立資料集，基於 torch 的 Dataset，其中 __len__ 可以獲得批量資料的數量 (e.g. len(dataset))，__getitem__ 能獲得某筆指定的資料 (e.g. dataset[idx])，這個應用回傳的是單筆的 image_stack 和對應的 coord。最後定義好一個 dataset 後就能放進 DataLoader 裡，決定要怎麼批量訪問這些資料
 
 比較特別的是，資料本身有透過 albumentations 套件做ㄧ些轉換，像是 resize, normalize, to tensor， unsqueeze，為的是滿足 model 預測所需的輸入資料。細節上，會讓原本資料從 (size, size, layer) 變為 (1, layer, size, size)
+
+當你使用下面方式遍歷 DataLoader 資料時，會以 tensor 形式回傳，images 大小是 (batch_size, 1, layer, size, size)，coords 大小是 (batch_size, 4)
+
+```python
+for step, (images, coords) in tqdm(enumerate(loader), total=len(loader)):
+```
 
 ## get_img_splits
 
@@ -60,6 +66,13 @@ loader 是最後建立好的 DataLoader
 ## gkern
 
 產生一個二維高斯函數，作為 kernal
+
+## predict_fn
+
+首先，`torch.no_grad` 會先把梯度下降關掉，`torch.autocast` 則是自動選擇必要的浮點數，然後就能夠把資料批量的丟給 model 預測。
+
+也就是呼叫 `model(images)` 方法，這會執行 model 內部的 forward 方法，這個方法先把原本的資料轉換為 (batch_size, layer, 1, size, size)，作為 `TimeSformer` 的輸入，輸出會是 (batch_size, patch_size)，最後再轉為 (..., 1, 4, 4) 的大小，然後經過一個 `tourch.sigmoid` 函數作為輸出結果
+
 
 
 
