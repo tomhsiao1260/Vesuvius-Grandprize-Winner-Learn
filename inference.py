@@ -1,3 +1,4 @@
+import os
 import cv2
 import torch
 import numpy as np
@@ -130,10 +131,10 @@ def predict_fn(loader, model, device, image_shape):
   kernel = gkern(size, 1)
   kernel = kernel / kernel.max()
 
-  print('Kernal shape: ', kernel.shape)
-
   mask_pred = np.zeros(image_shape)
   mask_count = np.zeros(image_shape)
+
+  if not os.path.exists('predict'): os.makedirs('predict')
 
   for step, (images, coords) in tqdm(enumerate(loader), total=len(loader)):
     images = images.to(device)
@@ -145,8 +146,21 @@ def predict_fn(loader, model, device, image_shape):
     y_preds = torch.sigmoid(y_preds).to('cpu')
 
     for i, (x1, y1, x2, y2) in enumerate(coords):
-      result = np.multiply(F.interpolate(y_preds[i].unsqueeze(0).float(), scale_factor=16, mode='bilinear').squeeze(0).squeeze(0).numpy(), kernel)
-      print('Result shape: ', result.shape)
+      # mask_pred[y1:y2, x1:x2] += images[i, :, 12, :, :].squeeze().numpy()
+      mask_pred[y1:y2, x1:x2] += np.multiply(F.interpolate(y_preds[i].unsqueeze(0).float(), scale_factor=16, mode='bilinear').squeeze(0).squeeze(0).numpy(), kernel)
+      mask_count[y1:y2, x1:x2] += np.ones((size, size))
+
+    filename = f"./predict/{fragment_id}_{step}.png"
+    image_save(filename, mask_pred / mask_count)
+
+  filename = f"./predict/{fragment_id}.png"
+  image_save(filename, mask_pred / mask_count)
+
+def image_save(filename, data):
+  data = np.clip(np.nan_to_num(data), a_min=0, a_max=1)
+  data /= data.max()
+  data = (data * 255).astype(np.uint8)
+  cv2.imwrite(filename, data)
 
 if __name__ == "__main__":
   model = RegressionPLModel.load_from_checkpoint(checkpoint_path, map_location=device, strict=False)
