@@ -4,6 +4,7 @@ wandb/
 .DS_Store
 
 /env
+/predict
 
 /train_scrolls/*
 !/train_scrolls/.gitkeep

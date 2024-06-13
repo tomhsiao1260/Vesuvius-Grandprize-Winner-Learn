@@ -5,7 +5,7 @@ fragment_id = '20230509182749'
 layer_path = f'./train_scrolls/{fragment_id}/layers'
 mask_path = f'./train_scrolls/{fragment_id}/{fragment_id}_mask.png'
 
-crop_fragment_id = 'pi'
+crop_fragment_id = 'pi_small'
 crop_layer_path = f'./train_scrolls/{crop_fragment_id}/layers'
 crop_mask_path = f'./train_scrolls/{crop_fragment_id}/{crop_fragment_id}_mask.png'
 
@@ -14,7 +14,8 @@ if __name__ == "__main__":
   h, w = mask.shape
 
   # cropped coodinates (upper & lower bound)
-  x0, y0, x1, y1 = 0.714, 0.645, 0.786, 0.817
+  x0, y0, x1, y1 = 0.719, 0.652, 0.741, 0.712
+  # x0, y0, x1, y1 = 0.719, 0.652, 0.786, 0.831
   x0, y0, x1, y1 = int(x0 * w), int(y0 * h), int(x1 * w), int(y1 * h)
 
   # create a folder for cropped layers data
